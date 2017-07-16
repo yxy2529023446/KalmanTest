@@ -3,9 +3,9 @@
 import pandas as pd  # 数据分析
 import numpy as np  # 数据处理
 import cv2
-import tools as tl  # 不推荐使用，推荐weblib
+import tools as tl
 from filterpy.kalman import KalmanFilter
-from sklearn.utils.linear_assignment_ import linear_assignment  # 科学计算，聚类算法
+from sklearn.utils.linear_assignment_ import linear_assignment
 import time
 
 # 数据和视频地址
