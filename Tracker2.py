@@ -7,7 +7,12 @@ from sklearn.utils.linear_assignment_ import linear_assignment
 import numpy as np
 import cv2
 from filterpy.kalman import KalmanFilter
-import time
+
+
+def get_cen(box):
+    x = (box[0] + box[2]) / 2
+    y = (box[1] + box[3]) / 2
+    return x, y
 
 
 def get_iou(box1, box2):
@@ -139,7 +144,7 @@ def associate_detections_to_trackers(detections, trackers, iou_threshold=0.1):
     return matched_indices, np.array(unmatched_detections), np.array(unmatched_trackers)
 
 
-class Xxx(object):
+class Sort:
     def __init__(self, max_age=20, min_hits=1.5):
         self.max_age = max_age
         self.min_hits = min_hits
@@ -194,116 +199,125 @@ class Xxx(object):
             return np.concatenate(ret)
         return np.empty((0, 5))
 
-# 视频和数据
-video_file = 'videos/144115192380048440_2017052310938_output2.mp4'
-data_file = 'data/144115192380048440_2017052310938_output.mp4.txt'
 
-mot_tracker = Xxx()
-
-colors = np.random.rand(128, 3) * 255
-
-track_line0, track_line1, track_line2, track_line3, track_line4 = [], [], [], [], []
-track_line0_id = track_line1_id = track_line2_id = track_line3_id = track_line4_id = 0
-
-# 开始的帧数
-frame_count = 60000
-
-total_targets = 0
-
-f1 = open(data_file)
-cap = cv2.VideoCapture(video_file)
-success, frame = cap.read()
-last_line = f1.readline().split()
-while success:
-    detections = []
-    current_line = f1.readline().split()
-    while last_line[-2] == current_line[-2]:
-        if float(last_line[-1]) > 0.3:
-            detections.append(last_line[:4])
-        last_line = current_line
-        current_line = f1.readline().split()
-    if float(last_line[-1]) > 0.3:
-        detections.append(last_line[:4])
-    last_line = current_line
-
-    detections = np.array(detections, dtype=float)
-    if detections.any():
-        detections[:, 2:4] += detections[:, 0:2]
-    trackers = mot_tracker.update(detections)
-
+def draw_lines(trackers, tracker_lines):
     for tracker in trackers:
         tracker = tracker.astype(int)
-        color = colors[tracker[4] % 128]
-        cv2.rectangle(frame, (tracker[0], tracker[1]), (tracker[2]-tracker[0], tracker[3]-tracker[1]), color, 2)
-        cv2.putText(frame, str(tracker[4]), (tracker[0], tracker[1]-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        tracker_id = tracker[4]
+        color = colors[tracker_id % 128]
+        if tracker_id not in tracker_lines:
+            tracker_lines[tracker_id] = [color, 0]
+        tracker_lines[tracker_id].append((int(tracker[0] + (tracker[2] - 2 * tracker[0]) / 2),
+                                          int(tracker[1] + (tracker[3] - 2 * tracker[1]) / 2)))
+        if len(tracker_lines[tracker_id]) > 100:
+            tracker_lines[tracker_id].pop(1)
 
-        xxx = tracker[4] % 5
-        if xxx == 0:
-            color0 = colors[tracker[4] % 128]
-            if track_line0_id != tracker[4]:
-                track_line0_id = tracker[4]
-                track_line0 = []
-            track_line0.append((int(tracker[0] + (tracker[2] - 2 * tracker[0]) / 2),
-                                 int(tracker[1] + (tracker[3] - 2 * tracker[1]) / 2)))
-        if xxx == 1:
-            color1 = colors[tracker[4] % 128]
-            if track_line1_id != tracker[4]:
-                track_line1_id = tracker[4]
-                track_line1 = []
-            track_line1.append((int(tracker[0] + (tracker[2] - 2 * tracker[0]) / 2),
-                                 int(tracker[1] + (tracker[3] - 2 * tracker[1]) / 2)))
-        if xxx == 2:
-            color2 = colors[tracker[4] % 128]
-            if track_line3_id != tracker[4]:
-                track_line3_id = tracker[4]
-                track_line2 = []
-            track_line2.append((int(tracker[0] + (tracker[2] - 2 * tracker[0]) / 2),
-                                 int(tracker[1] + (tracker[3] - 2 * tracker[1]) / 2)))
-        if xxx == 3:
-            color3 = colors[tracker[4] % 128]
-            if track_line3_id != tracker[4]:
-                track_line3_id = tracker[4]
-                track_line3 = []
-            track_line3.append((int(tracker[0] + (tracker[2] - 2 * tracker[0]) / 2),
-                                 int(tracker[1] + (tracker[3] - 2 * tracker[1]) / 2)))
-        if xxx == 4:
-            color4 = colors[tracker[4] % 128]
-            if track_line4_id != tracker[4]:
-                track_line4_id = tracker[4]
-                track_line4 = []
-            track_line4.append((int(tracker[0] + (tracker[2] - 2 * tracker[0]) / 2),
-                                 int(tracker[1] + (tracker[3] - 2 * tracker[1]) / 2)))
+        cv2.rectangle(frame, (tracker[0], tracker[1]), (tracker[2] - tracker[0], tracker[3] - tracker[1]), color, 2)
+        cv2.putText(frame, str(tracker[4]), (tracker[0], tracker[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
-    if len(track_line0) == 150:
-        track_line0.pop(0)
-    if len(track_line1) == 150:
-        track_line1.pop(0)
-    if len(track_line2) == 150:
-        track_line2.pop(0)
-    if len(track_line3) == 1500:
-        track_line3.pop(0)
-    if len(track_line4) == 150:
-        track_line4.pop(0)
+    tracker_lines_to_be_poped = []
+    for tracker_id, tracker_line in tracker_lines.items():
+        tracker_line[1] += 1
+        if tracker_line[1] > 100:
+            tracker_lines_to_be_poped.append(tracker_id)
+            continue
+        for i in range(len(tracker_line) - 3):
+            cv2.line(frame, tracker_line[i + 2], tracker_line[i + 3], tracker_line[0], 2)
+    for tracker_id in tracker_lines_to_be_poped:
+        tracker_lines.pop(tracker_id)
 
-    for i in range(len(track_line0) - 1):
-        cv2.line(frame, track_line0[i], track_line0[i + 1], color0, 2)
-    for i in range(len(track_line1) - 1):
-        cv2.line(frame, track_line1[i], track_line1[i + 1], color1, 2)
-    for i in range(len(track_line2) - 1):
-        cv2.line(frame, track_line2[i], track_line2[i + 1], color2, 2)
-    for i in range(len(track_line3) - 1):
-        cv2.line(frame, track_line3[i], track_line3[i + 1], color3, 2)
-    for i in range(len(track_line4) - 1):
-        cv2.line(frame, track_line4[i], track_line4[i + 1], color4, 2)
+    return tracker_lines
 
-    cv2.putText(frame, 'Frame:' + str(frame_count), (260, 20), cv2.FONT_HERSHEY_PLAIN, 1.4, (0, 255, 0), 2)
-    cv2.putText(frame, 'Count:' + str(total_targets), (465, 20), cv2.FONT_HERSHEY_PLAIN, 1.4, (0, 255, 0), 2)
-    cv2.imshow('TRACKING', frame)
-    cv2.waitKey(1)
 
+def get_detections(file, last_line):
+    detections = []
+    current_line = [float(x) for x in f1.readline().split()]
+    while last_line[-2] == current_line[-2]:
+        cen = get_cen(last_line)
+        if last_line[-1] > 0.3 and x1 < cen[0] < x2 and y2 < cen[1] < y1:
+            detections.append(last_line[:4])
+        last_line = current_line
+        current_line = [float(x) for x in f1.readline().split()]
+    cen = get_cen(last_line)
+    if last_line[-1] > 0.3 and x1 < cen[0] < x2 and y2 < cen[1] < y1:
+        detections.append(last_line[:4])
+    last_line = current_line
+    return np.array(detections, dtype=float), last_line
+
+
+def in_and_out_count(trackers):
+    global tracker_outs, tracker_ins, total_trackers
+    for tracker in trackers:
+        if tracker not in total_trackers:
+            total_trackers[tracker] = [0]
+        total_trackers[tracker].append(tracker.kf.x[-3])
+
+    trackers_to_be_poped = []
+    for tracker, velocities in total_trackers.items():
+        velocities[0] += 1
+        if velocities[0] > 100:
+            trackers_to_be_poped.append(tracker)
+            continue
+    for tracker in trackers_to_be_poped:
+        velocity_total = 0
+        for velocity in total_trackers[tracker][1:]:
+            velocity_total += velocity
+        if velocity_total > 0:
+            tracker_ins += 1
+        else:
+            tracker_outs += 1
+
+    for tracker in trackers_to_be_poped:
+        total_trackers.pop(tracker)
+
+
+if __name__ == '__main__':
+    # 视频和数据
+    video_file = 'videos/48435.mp4'
+    data_file = 'data/logp1.txt'
+
+    x1, y1, x2, y2 = 200, 350, 360, 10
+
+    mot_tracker = Sort()
+
+    colors = np.random.rand(128, 3) * 255
+
+    # 开始的帧数
+    frame_count = 0
+
+    tracker_lines = {}
+
+    total_trackers = {}
+
+    tracker_ins = tracker_outs = 0
+
+    f1 = open(data_file)
+    cap = cv2.VideoCapture(video_file)
     success, frame = cap.read()
+    last_line = [float(x) for x in f1.readline().split()]
+    while success:
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
 
-    frame_count = frame_count + 1
+        detections, last_line = get_detections(f1, last_line)
 
-f1.close()
-cap.release()
+        if detections.any():
+            detections[:, 2:4] += detections[:, 0:2]
+        trackers = mot_tracker.update(detections)
+
+        tracker_lines = draw_lines(trackers, tracker_lines)
+
+        in_and_out_count(mot_tracker.trackers)
+        print('in: {}, out: {}'.format(tracker_ins, tracker_outs))
+
+        cv2.putText(frame, 'Frame:' + str(frame_count), (260, 20), cv2.FONT_HERSHEY_PLAIN, 1.3, (0, 255, 0), 2)
+        cv2.putText(frame, '->:' + str(tracker_ins), (430, 20), cv2.FONT_HERSHEY_PLAIN, 1.3, (0, 255, 0), 2)
+        cv2.putText(frame, '<-:' + str(tracker_outs), (530, 20), cv2.FONT_HERSHEY_PLAIN, 1.3, (0, 255, 0), 2)
+        cv2.imshow('TRACKING', frame)
+        cv2.waitKey(1)
+
+        success, frame = cap.read()
+
+        frame_count = frame_count + 1
+
+    f1.close()
+    cap.release()
